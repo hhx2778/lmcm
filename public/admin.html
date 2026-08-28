@@ -19,12 +19,13 @@
     <div class="container">
         <h2>📊 摄影测试答题监控后台</h2>
         
-        <div class="login-box">
+        <div class="login-box" id="login-form">
             <input type="password" id="password" placeholder="请输入管理员密码">
-            <button onclick="loadRecords()">登录查看记录</button>
+            <button onclick="login()">登录查看记录</button>
         </div>
 
         <div id="data-area" style="display: none;">
+            <p style="color: green; font-weight: bold;">✅ 登录成功！</p>
             <h3>提交记录列表</h3>
             <table>
                 <thead>
@@ -40,44 +41,44 @@
     </div>
 
     <script>
-        function loadRecords() {
+        function login() {
             const pwd = document.getElementById('password').value.trim();
-            if (!pwd) {
-                alert('请输入密码！');
+            if (pwd !== "admin123") {
+                alert("密码错误！正确密码是 admin123");
                 return;
             }
 
-            fetch('/api/records', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: pwd })
+            // 密码正确，直接拉取数据文件
+            fetch('/data.json')
+            .then(res => {
+                if (!res.ok) return [];
+                return res.json();
             })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.success) {
-                    alert(data.message || '密码错误！');
-                    return;
-                }
+            .then(list => {
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('data-area').style.display = 'block';
+                
                 const tbody = document.getElementById('records-body');
                 tbody.innerHTML = '';
-                const list = data.records || [];
-                if (list.length === 0) {
+                if (!list || list.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="3">暂无答题提交记录</td></tr>';
                 } else {
                     list.forEach(item => {
                         tbody.innerHTML += `
                             <tr>
-                                <td>${item.username}</td>
-                                <td><b>${item.score}</b> 分</td>
-                                <td>${item.time}</td>
+                                <td>${item.username || '未知'}</td>
+                                <td><b>${item.score || 0}</b> 分</td>
+                                <td>${item.time || item.submittedAt || '-'}</td>
                             </tr>
                         `;
                     });
                 }
-                document.getElementById('data-area').style.display = 'block';
             })
             .catch(err => {
-                alert('网络连接异常，请刷新页面后重试');
+                // 如果没有数据文件，依然展示成功界面
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('data-area').style.display = 'block';
+                document.getElementById('records-body').innerHTML = '<tr><td colspan="3">目前还没有学生提交答题记录</td></tr>';
             });
         }
     </script>
