@@ -6,13 +6,13 @@
     <title>摄影测试 - 管理员后台</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .login-box { margin-bottom: 20px; padding: 15px; background: #fafafa; border-radius: 8px; display: flex; gap: 10px; align-items: center; }
-        input[type="password"] { padding: 8px 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
-        button { background: #1890ff; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 15px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #e8e8e8; padding: 10px; text-align: left; }
-        th { background: #fafafa; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .login-box { margin-bottom: 20px; display: flex; gap: 10px; }
+        input[type="password"] { padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
+        button { background: #1890ff; color: #fff; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f0f0f0; }
     </style>
 </head>
 <body>
@@ -31,7 +31,6 @@
                     <tr>
                         <th>姓名</th>
                         <th>得分</th>
-                        <th>评级</th>
                         <th>提交时间</th>
                     </tr>
                 </thead>
@@ -49,32 +48,28 @@
             }
 
             fetch('/api/records', {
-                method: 'GET',
-                headers: {
-                    'x-admin-password': pwd
-                }
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd })
             })
-            .then(res => {
-                if (res.status === 401) {
-                    throw new Error('PWD_ERROR');
-                }
-                return res.json();
-            })
+            .then(res => res.json())
             .then(data => {
+                if (!data.success) {
+                    alert(data.message || '密码错误！');
+                    return;
+                }
                 const tbody = document.getElementById('records-body');
                 tbody.innerHTML = '';
-                
                 const list = data.records || [];
                 if (list.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4">暂无答题提交记录</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="3">暂无答题提交记录</td></tr>';
                 } else {
                     list.forEach(item => {
                         tbody.innerHTML += `
                             <tr>
-                                <td>${item.username || '-'}</td>
+                                <td>${item.username}</td>
                                 <td><b>${item.score}</b> 分</td>
-                                <td>${item.level || '-'}</td>
-                                <td>${item.time || item.submittedAt || '-'}</td>
+                                <td>${item.time}</td>
                             </tr>
                         `;
                     });
@@ -82,11 +77,7 @@
                 document.getElementById('data-area').style.display = 'block';
             })
             .catch(err => {
-                if (err.message === 'PWD_ERROR') {
-                    alert('密码错误！');
-                } else {
-                    alert('网络错误或接口不匹配，无法获取数据');
-                }
+                alert('网络连接异常，请刷新页面后重试');
             });
         }
     </script>
