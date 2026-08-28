@@ -8,6 +8,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 const DATA_FILE = path.join(__dirname, 'data.json');
 
 app.use(express.json());
+// 同时托管根目录和 public 目录，防止文件位置放错导致 404
+app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 确保数据文件存在
@@ -23,33 +25,42 @@ function readRecords() {
     }
 }
 
-// 提交答题接口
-app.post('/api/submit', (req, res) => {
-    const { username, score, details } = req.body;
-    const records = readRecords();
-    const newRecord = {
-        id: Date.now().toString(),
-        username: username || '匿名',
-        score: score || 0,
-        details: details || {},
-        time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-        timestamp: Date.now()
-    };
-    records.push(newRecord);
-    fs.writeFileSync(DATA_FILE, JSON.stringify(records, null, 2), 'utf8');
-    res.json({ success: true });
+// 兼容直接访问 data.json
+app.get('/data.json', (req, res) => {
+    res.sendFile(DATA_FILE);
 });
 
-// 管理员获取记录接口（同时支持 POST 和 GET 提交密码）
-app.post('/api/records', (req, res) => {
-    const { password } = req.body;
-    const headerPassword = req.headers['x-admin-password'];
-    
-    if (password === ADMIN_PASSWORD || headerPassword === ADMIN_PASSWORD) {
-        const records = readRecords();
-        res.json({ success: true, records: records });
+// 即使 admin.html 找不到，也兜底返回一个后台页面
+app.get('/admin.html', (req, res) => {
+    const adminPathInPublic = path.join(__dirname, 'public', 'admin.html');
+    const adminPathInRoot = path.join(__dirname, 'admin.html');
+
+    if (fs.existsSync(adminPathInPublic)) {
+        res.sendFile(adminPathInPublic);
+    } else if (fs.existsSync(adminPathInRoot)) {
+        res.sendFile(adminPathInRoot);
     } else {
-        res.status(401).json({ success: false, message: '密码错误' });
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"><title>后台</title></head>
+            <body style="padding:20px;font-family:sans-serif;">
+                <h2>管理员后台</h2>
+                <input type="password" id="p" placeholder="输入密码 admin123">
+                <button onclick="check()">登录</button>
+                <pre id="out" style="margin-top:20px;"></pre>
+                <script>
+                    function check(){
+                        if(document.getElementById('p').value === 'admin123'){
+                            fetch('/data.json').then(r=>r.text()).then(t=>{
+                                document.getElementById('out').innerText = t;
+                            });
+                        } else { alert('密码错误'); }
+                    }
+                </script>
+            </body>
+            </html>
+        `);
     }
 });
 
