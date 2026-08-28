@@ -6,13 +6,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// 答卷存放目录
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-// 题目接口
+// API 接口
 app.get('/api/questions', (req, res) => {
   res.json({
     questions: [],
@@ -20,7 +18,6 @@ app.get('/api/questions', (req, res) => {
   });
 });
 
-// 提交答卷
 app.post('/api/submit', (req, res) => {
   const body = req.body;
   const filename = Date.now() + ".json";
@@ -30,7 +27,6 @@ app.post('/api/submit', (req, res) => {
   });
 });
 
-// 管理员‑登录校验（简单固定密码，你后续可以自行改passwd）
 const ADMIN_PASS = "123456";
 app.post('/api/admin/login', (req,res)=>{
   if(req.body.pwd === ADMIN_PASS){
@@ -39,17 +35,25 @@ app.post('/api/admin/login', (req,res)=>{
   res.json({ok:false});
 });
 
-// 获取答卷列表
 app.get('/api/admin/list', (req,res)=>{
   const files = fs.readdirSync(DATA_DIR);
   const list = [];
   for(const f of files){
-    const raw = fs.readFileSync(path.join(DATA_DIR,f),'utf‑8');
+    const raw = fs.readFileSync(path.join(DATA_DIR,f),'utf-8');
     list.push(JSON.parse(raw));
   }
   res.json(list);
 });
 
+// 单独给 /admin 返回管理员页面
+app.get('/admin', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','admin.html'));
+});
+
+// 静态文件
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 兜底，放在最后
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public','index.html'));
 });
