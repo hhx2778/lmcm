@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>传媒社招新选拔试卷</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { -webkit-tap-highlight-color: transparent; }
+  .opt-label { display: flex; align-items: flex-start; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+  .opt-label:active { background: #eff6ff; border-color: #3b82f6; }
+  .opt-label input { margin-top: 3px; margin-right: 10px; flex-shrink: 0; width: 18px; height: 18px; }
+  .opt-label span { font-size: 15px; line-height: 1.5; }
+  .timer-warning { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen pb-24">
+
+<!-- 顶部栏 -->
+<div class="bg-blue-600 text-white px-4 py-3 sticky top-0 z-10 shadow">
+  <div class="flex justify-between items-center">
+    <div class="text-base font-bold">传媒社招新试卷</div>
+    <div id="timer" class="text-sm font-mono bg-white/20 px-3 py-1 rounded-full">15:00</div>
+  </div>
+</div>
+
+<!-- 开始页 -->
+<div id="startPage" class="px-4 py-8 max-w-2xl mx-auto">
+  <div class="bg-white rounded-2xl p-6 shadow-sm text-center">
+    <div class="text-5xl mb-4">📝</div>
+    <h1 class="text-xl font-bold mb-2">高中传媒社招新选拔试卷</h1>
+    <div class="text-sm text-gray-500 mb-6">考试时间：15分钟｜满分：50分</div>
+    <div class="text-left bg-gray-50 rounded-lg p-4 mb-6 text-sm text-gray-600 space-y-1">
+      <p>• 共40题，单选30题（每题1分），多选10题（每题2分）</p>
+      <p>• 多选题全部选对得2分，少选得1分，错选不得分</p>
+      <p>• 倒计时结束将自动提交试卷</p>
+      <p>• 提交后不可修改答案</p>
+    </div>
+    <div class="mb-4">
+      <input type="text" id="usernameInput" class="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:border-blue-500" placeholder="请输入你的姓名">
+    </div>
+    <button id="startBtn" class="w-full bg-blue-600 text-white py-4 rounded-xl text-base font-bold active:bg-blue-700">开始考试</button>
+  </div>
+</div>
+
+<!-- 答题页 -->
+<div id="examPage" class="px-4 py-4 max-w-2xl mx-auto hidden">
+  <div id="paper"></div>
+</div>
+
+<!-- 提交按钮 -->
+<div id="submitBar" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 z-10 hidden">
+  <div class="max-w-2xl mx-auto flex gap-2">
+    <div class="flex-1 text-sm text-gray-500 flex items-center justify-center">
+      <span id="answeredCount">已答 0/40</span>
+    </div>
+    <button id="submitBtn" class="flex-1 bg-blue-600 text-white py-3 rounded-xl text-base font-bold active:bg-blue-700">提交试卷</button>
+  </div>
+</div>
+
+<!-- 结果弹窗 -->
+<div id="resultMask" class="fixed inset-0 bg-black/50 z-30 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+    <div class="text-center">
+      <div id="resultEmoji" class="text-5xl mb-3">🎉</div>
+      <h3 class="text-xl font-bold mb-2">考试结束</h3>
+      <div id="resultContent" class="text-gray-600 text-sm space-y-2 my-4"></div>
+      <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold active:bg-blue-700">返回首页</button>
+    </div>
+  </div>
+</div>
+
+<!-- 加载中 -->
+<div id="loadingMask" class="fixed inset-0 bg-black/30 z-40 hidden flex items-center justify-center">
+  <div class="bg-white rounded-xl px-6 py-4 text-sm">提交中...</div>
+</div>
+
+<script>
+let questions = [];
+let examDuration = 15 * 60;
+let timeLeft = examDuration;
+let timerInterval = null;
+let username = '';
+let submitted = false;
+
+const letters = ["A","B","C","D"];
+
+// 开始考试
+document.getElementById('startBtn').onclick = async function() {
+  username = document.getElementById('usernameInput').value.trim();
+  if (!username) { alert('请输入你的姓名'); return; }
+
+  // 加载题目
+  try {
+    const res = await fetch('/api/questions');
+    const data = await res.json();
+    questions = data.questions;
+    examDuration = data.examDuration || 15 * 60;
+    timeLeft = examDuration;
+  } catch (e) {
+    alert('加载题目失败，请刷新重试');
+    return;
+  }
+
+  // 渲染试卷
+  renderPaper();
+
+  // 切换页面
+  document.getElementById('startPage').classList.add('hidden');
+  document.getElementById('examPage').classList.remove('hidden');
+  document.getElementById('submitBar').classList.remove('hidden');
+
+  // 启动倒计时
+  startTimer();
+  updateAnsweredCount();
+};
+
+function renderPaper() {
+  const paperDom = document.getElementById('paper');
+  paperDom.innerHTML = '';
+  questions.forEach(q => {
+    const typeTag = q.type === 'multi' ? '<span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded ml-2">多选</span>' : '';
+    let html = `<div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+      <div class="font-medium text-base mb-3 leading-relaxed">${q.id}. ${q.title}${typeTag}</div>
+      <div>`;
+    q.opts.forEach((opt, i) => {
+      const val = letters[i];
+      const inputType = q.type === 'single' ? 'radio' : 'checkbox';
+      html += `<label class="opt-label"><input type="${inputType}" name="q${q.id}" value="${val}" onchange="updateAnsweredCount()"><span><b>${val}.</b> ${opt}</span></label>`;
+    });
+    html += `</div></div>`;
+    paperDom.innerHTML += html;
+  });
+}
+
+function updateAnsweredCount() {
+  let count = 0;
+  questions.forEach(q => {
+    if (q.type === 'single') {
+      if (document.querySelector(`input[name="q${q.id}"]:checked`)) count++;
+    } else {
+      if (document.querySelectorAll(`input[name="q${q.id}"]:checked`).length > 0) count++;
+    }
+  });
+  document.getElementById('answeredCount').textContent = `已答 ${count}/${questions.length}`;
+}
+
+function startTimer() {
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      if (!submitted) {
+        alert('考试时间到，自动提交试卷');
+        submitExam(true);
+      }
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft / 60);
+  const s = timeLeft % 60;
+  const timerEl = document.getElementById('timer');
+  timerEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  if (timeLeft <= 60) {
+    timerEl.classList.add('bg-red-500', 'timer-warning');
+    timerEl.classList.remove('bg-white/20');
+  }
+}
+
+// 提交试卷
+document.getElementById('submitBtn').onclick = function() {
+  if (submitted) return;
+  const unanswered = questions.length - parseInt(document.getElementById('answeredCount').textContent.split('/')[0].replace('已答 ',''));
+  if (unanswered > 0) {
+    if (!confirm(`还有 ${unanswered} 题未作答，确定提交吗？`)) return;
+  } else {
+    if (!confirm('确定提交试卷吗？提交后不可修改。')) return;
+  }
+  submitExam(false);
+};
+
+async function submitExam(autoSubmit) {
+  if (submitted) return;
+  submitted = true;
+  clearInterval(timerInterval);
+
+  document.getElementById('loadingMask').classList.remove('hidden');
+
+  // 收集答案
+  const answers = {};
+  questions.forEach(q => {
+    if (q.type === 'single') {
+      const sel = document.querySelector(`input[name="q${q.id}"]:checked`);
+      answers[q.id] = sel ? sel.value : '';
+    } else {
+      const checks = Array.from(document.querySelectorAll(`input[name="q${q.id}"]:checked`)).map(e => e.value);
+      answers[q.id] = checks.sort().join('');
+    }
+  });
+
+  try {
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, answers })
+    });
+    const data = await res.json();
+
+    document.getElementById('loadingMask').classList.add('hidden');
+
+    if (data.success) {
+      showResult(data.score, data.level, autoSubmit);
+    } else {
+      alert('提交失败：' + (data.error || '未知错误'));
+      submitted = false;
+    }
+  } catch (e) {
+    document.getElementById('loadingMask').classList.add('hidden');
+    alert('网络错误，提交失败，请重试');
+    submitted = false;
+  }
+}
+
+function showResult(score, level, autoSubmit) {
+  const emoji = score >= 45 ? '🏆' : score >= 38 ? '🎉' : score >= 30 ? '👍' : score >= 20 ? '📚' : '💪';
+  document.getElementById('resultEmoji').textContent = emoji;
+  document.getElementById('resultContent').innerHTML = `
+    <p>姓名：<b>${username}</b></p>
+    <p>得分：<span class="text-3xl font-bold text-red-600">${score}</span> / 50</p>
+    <p>评级：${level}</p>
+    ${autoSubmit ? '<p class="text-xs text-orange-500">（时间到自动提交）</p>' : ''}
+    <p class="text-xs text-gray-400 mt-3">答卷已保存，管理员可在后台查看</p>
+  `;
+  document.getElementById('resultMask').classList.remove('hidden');
+}
+</script>
+</body>
+</html>

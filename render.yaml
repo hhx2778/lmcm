@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: media-exam
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: ADMIN_PASSWORD
+        value: admin123
+      - key: NODE_VERSION
+        value: 20.11.1
