@@ -2,77 +2,92 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>摄影测试 - 管理员后台</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; background: #f4f6f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .login-box { margin-bottom: 20px; padding: 15px; background: #fafafa; border-radius: 8px; display: flex; gap: 10px; align-items: center; }
+        input[type="password"] { padding: 8px 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
+        button { background: #1890ff; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 15px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        input, button { padding: 8px 12px; font-size: 14px; }
-        button { background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        th, td { border: 1px solid #e8e8e8; padding: 10px; text-align: left; }
+        th { background: #fafafa; }
     </style>
 </head>
 <body>
+    <div class="container">
+        <h2>📊 摄影测试答题监控后台</h2>
+        
+        <div class="login-box">
+            <input type="password" id="password" placeholder="请输入管理员密码">
+            <button onclick="loadRecords()">登录查看记录</button>
+        </div>
 
-    <h1>📊 摄影测试答题监控后台</h1>
-
-    <div class="card" id="login-section">
-        <h3>管理员登录</h3>
-        <input type="password" id="admin-pass" placeholder="请输入管理员密码">
-        <button onclick="fetchRecords()">登录查看记录</button>
-    </div>
-
-    <div class="card" id="data-section" style="display: none;">
-        <h3>答题记录总览（满分 75 分）</h3>
-        <button onclick="fetchRecords()">🔄 刷新数据</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>提交时间</th>
-                    <th>考生姓名</th>
-                    <th>最终得分</th>
-                    <th>各题勾选详情</th>
-                </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
+        <div id="data-area" style="display: none;">
+            <h3>提交记录列表</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>姓名</th>
+                        <th>得分</th>
+                        <th>评级</th>
+                        <th>提交时间</th>
+                    </tr>
+                </thead>
+                <tbody id="records-body"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        function fetchRecords() {
-            const password = document.getElementById('admin-pass').value;
+        function loadRecords() {
+            const pwd = document.getElementById('password').value.trim();
+            if (!pwd) {
+                alert('请输入密码！');
+                return;
+            }
 
-            fetch('/api/admin/records', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (!res.success) {
-                    alert(res.message);
-                    return;
+            fetch('/api/records', {
+                method: 'GET',
+                headers: {
+                    'x-admin-password': pwd
                 }
-
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('data-section').style.display = 'block';
-
-                const tbody = document.getElementById('table-body');
-                tbody.innerHTML = '';
-
-                res.data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${item.submittedAt}</td>
-                        <td><b>${item.username}</b></td>
-                        <td><b style="color: red; font-size: 16px;">${item.score}</b> / 75</td>
-                        <td><code>${JSON.stringify(item.details)}</code></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
             })
-            .catch(err => alert('网络错误，无法获取数据'));
+            .then(res => {
+                if (res.status === 401) {
+                    throw new Error('PWD_ERROR');
+                }
+                return res.json();
+            })
+            .then(data => {
+                const tbody = document.getElementById('records-body');
+                tbody.innerHTML = '';
+                
+                const list = data.records || [];
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4">暂无答题提交记录</td></tr>';
+                } else {
+                    list.forEach(item => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${item.username || '-'}</td>
+                                <td><b>${item.score}</b> 分</td>
+                                <td>${item.level || '-'}</td>
+                                <td>${item.time || item.submittedAt || '-'}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                document.getElementById('data-area').style.display = 'block';
+            })
+            .catch(err => {
+                if (err.message === 'PWD_ERROR') {
+                    alert('密码错误！');
+                } else {
+                    alert('网络错误或接口不匹配，无法获取数据');
+                }
+            });
         }
     </script>
 </body>
