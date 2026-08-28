@@ -14,28 +14,26 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 确保数据目录和文件存在
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, '[]', 'utf‑8');
+    fs.writeFileSync(DATA_FILE, '[]', 'utf-8');
 }
 
 function readRecords() {
     try {
-        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf‑8'));
+        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
     } catch (e) {
         return [];
     }
 }
 
 function writeRecords(records) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(records, null, 2), 'utf‑8');
+    fs.writeFileSync(DATA_FILE, JSON.stringify(records, null, 2), 'utf-8');
 }
 
-// 标准答案
 const answerKey = {
     "1":"B","2":"C","3":"B","4":"C","5":"B","6":"C","7":"A","8":"C","9":"A","10":"C",
     "11":"B","12":"B","13":"B","14":"B","15":"A","16":"C","17":"B","18":"C","19":"B","20":"A",
@@ -43,7 +41,6 @@ const answerKey = {
     "31":"ABC","32":"ABCD","33":"ABC","34":"ABC","35":"AB","36":"ABC","37":"AC","38":"ABC","39":"ABD","40":"ABC"
 };
 
-// 题目数据
 const questions = [
     {id:1,type:"single",title:"摄影中，…"},
     {id:2,type:"single",title:"在光圈、快…"},
@@ -114,12 +111,10 @@ function getLevel(score){
     return '建议结合面试实操进一步判断';
 }
 
-//API：获取题目
 app.get('/api/questions',(req,res)=>{
     res.json({ questions, examDuration:30*60*1000 });
 });
 
-//API：提交答卷
 app.post('/api/submit',(req,res)=>{
     const { username, answers } = req.body;
     if(!username || !username.trim()){
@@ -136,7 +131,7 @@ app.post('/api/submit',(req,res)=>{
         score,
         level,
         answers,
-        time:new Date().toLocaleString('zh‑CN'),
+        time:new Date().toLocaleString('zh-CN'),
         timestamp:Date.now()
     };
     const records = readRecords();
@@ -145,16 +140,14 @@ app.post('/api/submit',(req,res)=>{
     res.json({ success:true, score, level });
 });
 
-//管理员鉴权中间件
 function authAdmin(req,res,next){
-    const password = req.headers['x‑admin‑pwd'];
+    const password = req.headers['x-admin-pwd'];
     if(password !== ADMIN_PASSWORD){
         return res.status(401).json({err:"未授权"});
     }
     next();
 }
 
-//API：获取所有答卷（管理员）
 app.get('/api/records',authAdmin,(req,res)=>{
     const records = readRecords();
     const list = records.map(r=>({
@@ -164,11 +157,10 @@ app.get('/api/records',authAdmin,(req,res)=>{
         level:r.level,
         time:r.time,
         timestamp:r.timestamp
-    })).sort((a,b)=>b.timestamp‑a.timestamp);
+    })).sort((a,b)=>b.timestamp-a.timestamp);
     res.json({ records:list, total:list.length });
 });
 
-//API：获取单条答卷详情
 app.get('/api/records/:id',authAdmin,(req,res)=>{
     const records = readRecords();
     const rec = records.find(x=>x.id === req.params.id);
@@ -176,7 +168,6 @@ app.get('/api/records/:id',authAdmin,(req,res)=>{
     res.json(rec);
 });
 
-//API：统计数据
 app.get('/api/stats',authAdmin,(req,res)=>{
     const records = readRecords();
     const total = records.length;
@@ -185,17 +176,15 @@ app.get('/api/stats',authAdmin,(req,res)=>{
     res.json({ total, avgScore, maxScore });
 });
 
-//API：清空所有答卷
 app.delete('/api/records',authAdmin,(req,res)=>{
     writeRecords([]);
     res.json({ success:true });
 });
 
-//API：导出所有答卷
 app.get('/api/export',authAdmin,(req,res)=>{
     const records = readRecords();
-    res.setHeader('Content‑Type','application/json;charset=utf‑8');
-    res.setHeader('Content‑Disposition','attachment;filename=records.json');
+    res.setHeader('Content-Type','application/json;charset=utf-8');
+    res.setHeader('Content-Disposition','attachment;filename=records.json');
     res.send(JSON.stringify(records,null,2));
 });
 
@@ -203,4 +192,3 @@ app.listen(PORT,()=>{
     console.log(`传媒招新答题系统已启动，端口${PORT}`);
     console.log('后台管理密码：',ADMIN_PASSWORD);
 });
-
